@@ -1,0 +1,9 @@
+Kp_f: 1.00
+Ki_f: 0.03
+Kd_f: 0.01
+Kp_a: 0.05
+Ki_a: 0.03
+Kd_a: 0.01
+dt: 0.1
+target_distance: 7.07106
+target_angle: 0.3926875
