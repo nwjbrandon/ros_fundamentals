@@ -1,0 +1,4 @@
+<launch>
+  <node name = "rqt_error_forward_dashboard" pkg = "rqt_gui" type = "rqt_gui" respawn = "false" output = "screen" args = "--perspective-file $(find project_1)/config/error_forward.perspective"/>
+  <node name = "rqt_error_angle_dashboard" pkg = "rqt_gui" type = "rqt_gui" respawn = "false" output = "screen" args = "--perspective-file $(find project_1)/config/error_angle.perspective"/>
+</launch>

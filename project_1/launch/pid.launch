@@ -14,4 +14,5 @@
   </include>
 
   <node pkg="project_1" type="project_1" name="pid_control_node" output="screen" launch-prefix="gnome-terminal --command"/>
+  <include file="$(find project_1)/launch/rqt.launch"/>
 </launch>
