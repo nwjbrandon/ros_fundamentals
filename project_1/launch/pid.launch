@@ -9,6 +9,7 @@
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" value="$(arg world_name)"/>
   </include>
+
   <include file="$(find husky_gazebo)/launch/spawn_husky.launch">
     <arg name="laser_enabled" value="$(arg laser_enabled)"/>
   </include>
