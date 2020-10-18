@@ -1,0 +1,51 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(project_2)
+
+add_compile_options(-std=c++11)
+find_package(catkin REQUIRED
+  roscpp
+  sensor_msgs
+  nav_msgs
+  geometry_msgs
+  std_msgs
+)
+catkin_package(
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS
+  roscpp
+  sensor_msgs
+  nav_msgs
+  geometry_msgs
+  std_msgs
+)
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+add_executable(
+  range_detect_node
+  src/range_detect_node.cpp
+  src/RangeDetect.cpp
+)
+target_link_libraries(
+  range_detect_node
+  ${catkin_LIBRARIES}
+)
+add_executable(
+  path_plan_node
+  src/path_plan_node.cpp
+  src/PathPlan.cpp
+)
+target_link_libraries(
+  path_plan_node
+  ${catkin_LIBRARIES}
+)
+add_executable(
+  bot_control_node
+  src/bot_control_node.cpp
+  src/BotControl.cpp
+)
+target_link_libraries(
+  bot_control_node
+  ${catkin_LIBRARIES}
+)
