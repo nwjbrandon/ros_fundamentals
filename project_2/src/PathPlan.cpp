@@ -2,7 +2,7 @@
 #include "PathPlan/PathPlan.hpp"
 #include "PreDefine.hpp"
 #include <math.h>
-
+#include <queue>
 /*
  * Constructor
  */
@@ -245,72 +245,72 @@ void PathPlan::path_plan_alg()
   // make sure the goal cell has been put in the path_map
   if(!path_map_initialized_) initializePathMap();
   
-  mat visited_map(GRID_SIZE, GRID_SIZE, fill::zeros);
-  mat is_queued(GRID_SIZE, GRID_SIZE, fill::zeros);
+  mat visited_map(GRID_SIZE, GRID_SIZE, fill::zeros);  
+  std::queue<pair<int, int>> q;
+  q.push(pair<int,int>(GOAL_X, GOAL_Y));
   
-  std::vector<pair<int, int>> reached_queue;
-  reached_queue.push_back(pair<int, int>(GOAL_X, GOAL_Y));
-  
-  int nVisited = 0;
-  int nCells = GRID_SIZE * GRID_SIZE;
   int mdist_from_goal_node = 0;
-  pair<int, int> node;
-  
-  int x_queue, y_queue; //tmp coord in queue
-  
-  while(nVisited < nCells){
-    int min_dist = 1000;
-    int queue_length = reached_queue.size();
+
+  while (q.size()) {
+    pair<int, int> node = q.front();
+    q.pop();
+    // int min_dist = 1000;
+    // int queue_length = reached_queue.size();
     //ROS_INFO("queue length: %d", queue_length);
     
-    for(int i = 0; i<queue_length; i++){
-      pair<int, int> tmp = reached_queue[i];
+    // for(int i = 0; i<queue_length; i++){
+    //   pair<int, int> tmp = reached_queue[i];
       //find the minimum goal distance node that hasn't been visited
 
-      if(visited_map.at(tmp.first, tmp.second) == 0){
-      	if(path_map_(tmp.first, tmp.second) < min_dist){
-      		min_dist = path_map_.at(tmp.first, tmp.second);
-      		node = tmp;
-      	}
-      }
-    }
+    //   if(visited_map.at(tmp.first, tmp.second) == 0){
+    //   	if(path_map_(tmp.first, tmp.second) < min_dist){
+    //   		min_dist = path_map_.at(tmp.first, tmp.second);
+    //   		node = tmp;
+    //   	}
+    //   }
+    // }
     
     visited_map(node.first, node.second) = 1; //this node has been visited
     //visited_map.print();
-    nVisited++;
+    // nVisited++;
     //ROS_INFO("Add %d nodes. min_dist: %d", nVisited, min_dist);
     
     // extend to adjacent cells to this node
     for(int direction = NORTH; direction <= WEST; direction++){
       
-	if(!hasWall(node.first, node.second, direction)){
-	  // there is no wall on that direction, and the adjacent node hasn't been put in the queue_length
-	  
-	  if(direction == NORTH && node.second+1 < GRID_SIZE){
-	    x_queue = node.first; y_queue = node.second+1;
-	  }
-	  if(direction == EAST && node.first+1 < GRID_SIZE){
-	    x_queue = node.first+1; y_queue = node.second;
-	  }
-	  if(direction == SOUTH && node.second-1 >= 0){
-	    x_queue = node.first; y_queue = node.second-1;
-	  }
-	  if(direction == WEST && node.first-1 >= 0){
-	    x_queue = node.first-1; y_queue = node.second;
-	  }
-	  
-	  if(!is_queued(x_queue, y_queue)){
-	    // put the adjacent cell in the queue
-	    reached_queue.push_back(pair<int, int>(x_queue, y_queue));
-	    is_queued(x_queue, y_queue) = 1;
-	  }
-	  
-	  // update the path_map, update the shortest path to goal
-	  path_map_(x_queue, y_queue) = min(path_map_(x_queue, y_queue), min_dist+1);
-	  
-	  //ROS_INFO("%d no wall. (%d, %d) path_map is %d", direction, x_queue, y_queue, path_map(x_queue, y_queue));
-	}
-	
+      if(!hasWall(node.first, node.second, direction)){
+    //     // there is no wall on that direction, and the adjacent node hasn't been put in the queue_length
+        int x_queue, y_queue;
+        
+        if(direction == NORTH && node.second+1 < GRID_SIZE){
+          x_queue = node.first; y_queue = node.second+1;
+        }
+        if(direction == EAST && node.first+1 < GRID_SIZE){
+          x_queue = node.first+1; y_queue = node.second;
+        }
+        if(direction == SOUTH && node.second-1 >= 0){
+          x_queue = node.first; y_queue = node.second-1;
+        }
+        if(direction == WEST && node.first-1 >= 0){
+          x_queue = node.first-1; y_queue = node.second;
+        }
+
+        if(visited_map.at(x_queue, y_queue) == 0) {
+          q.push(pair<int,int>(x_queue, y_queue));
+          path_map_(x_queue, y_queue) = path_map_(node.first, node.second) + 1; //min(path_map_(x_queue, y_queue), min_dist+1);
+        }
+
+        
+    //     if(!is_queued(x_queue, y_queue)){
+    //       // put the adjacent cell in the queue
+    //       reached_queue.push_back(pair<int, int>(x_queue, y_queue));
+    //       is_queued(x_queue, y_queue) = 1;
+      }
+        
+    //     // update the path_map, update the shortest path to goal
+        
+    //     //ROS_INFO("%d no wall. (%d, %d) path_map is %d", direction, x_queue, y_queue, path_map(x_queue, y_queue));
+      
     }
     //test print the path_map
     //path_map_.print();
