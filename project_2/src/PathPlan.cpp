@@ -2,6 +2,7 @@
 #include "PathPlan/PathPlan.hpp"
 #include "PreDefine.hpp"
 #include <math.h>
+#include <algorithm>
 
 /*
  * Constructor
@@ -24,22 +25,11 @@ PathPlan::PathPlan(ros::NodeHandle& nh)
   
   initializeWall();
   initializePathMap();
-  
+
+  // add the starting point to history
+  history.push(std::pair<int, int>(0, 0));
+
   ROS_INFO("PathPlan node initialized successfully!");
-  
-  /* for test purpose on dijkstra
-  setWall(0, 0, EAST);
-  setWall(0, 1, EAST);
-  setWall(0, 2, EAST);
-  setWall(0, 3, EAST);
-  setWall(0, 4, EAST);
-  setWall(0, 5, EAST);
-  setWall(0, 6, EAST);
-  setWall(0, 7, EAST);
-  wall_map.print();
-  dijkstra();
-  */
-  
   
 }
 
@@ -58,7 +48,6 @@ void PathPlan::spin()
 
 void PathPlan::odomCallback(const nav_msgs::OdometryConstPtr& odomMsg)
 {
-  
   //use the first pose of Turtlebot as the original point, with front pointing to y axis
   pos_y_ = odomMsg->pose.pose.position.y;
   pos_x_ = odomMsg->pose.pose.position.x;
@@ -212,16 +201,16 @@ void PathPlan::initializeWall()
   for(int row = 0; row < GRID_SIZE; row++){
     for(int col = 0; col < GRID_SIZE; col++){
       if(row == 0){
-	wall_map(row, col, WEST) = WALL;
+        wall_map(row, col, WEST) = WALL;
       }
       if(row == GRID_SIZE-1){
-	wall_map(row, col, EAST) = WALL;
+        wall_map(row, col, EAST) = WALL;
       }
       if(col == 0){
-	wall_map(row, col, SOUTH) = WALL;
+        wall_map(row, col, SOUTH) = WALL;
       }
       if(col == GRID_SIZE-1){
-	wall_map(row, col, NORTH) = WALL;
+        wall_map(row, col, NORTH) = WALL;
       }
     }
   }
@@ -283,92 +272,185 @@ void PathPlan::path_plan_alg()
     // extend to adjacent cells to this node
     for(int direction = NORTH; direction <= WEST; direction++){
       
-	if(!hasWall(node.first, node.second, direction)){
-	  // there is no wall on that direction, and the adjacent node hasn't been put in the queue_length
-	  
-	  if(direction == NORTH && node.second+1 < GRID_SIZE){
-	    x_queue = node.first; y_queue = node.second+1;
-	  }
-	  if(direction == EAST && node.first+1 < GRID_SIZE){
-	    x_queue = node.first+1; y_queue = node.second;
-	  }
-	  if(direction == SOUTH && node.second-1 >= 0){
-	    x_queue = node.first; y_queue = node.second-1;
-	  }
-	  if(direction == WEST && node.first-1 >= 0){
-	    x_queue = node.first-1; y_queue = node.second;
-	  }
-	  
-	  if(!is_queued(x_queue, y_queue)){
-	    // put the adjacent cell in the queue
-	    reached_queue.push_back(pair<int, int>(x_queue, y_queue));
-	    is_queued(x_queue, y_queue) = 1;
-	  }
-	  
-	  // update the path_map, update the shortest path to goal
-	  path_map_(x_queue, y_queue) = min(path_map_(x_queue, y_queue), min_dist+1);
-	  
-	  //ROS_INFO("%d no wall. (%d, %d) path_map is %d", direction, x_queue, y_queue, path_map(x_queue, y_queue));
-	}
+      if(!hasWall(node.first, node.second, direction)){
+        // there is no wall on that direction, and the adjacent node hasn't been put in the queue_length
+        
+        if(direction == NORTH && node.second+1 < GRID_SIZE){
+          x_queue = node.first; y_queue = node.second+1;
+        }
+        if(direction == EAST && node.first+1 < GRID_SIZE){
+          x_queue = node.first+1; y_queue = node.second;
+        }
+        if(direction == SOUTH && node.second-1 >= 0){
+          x_queue = node.first; y_queue = node.second-1;
+        }
+        if(direction == WEST && node.first-1 >= 0){
+          x_queue = node.first-1; y_queue = node.second;
+        }
+        
+        if(!is_queued(x_queue, y_queue)){
+          // put the adjacent cell in the queue
+          reached_queue.push_back(pair<int, int>(x_queue, y_queue));
+          is_queued(x_queue, y_queue) = 1;
+        }
+        
+        // update the path_map, update the shortest path to goal
+        path_map_(x_queue, y_queue) = min(path_map_(x_queue, y_queue), min_dist+1);
+        
+        //ROS_INFO("%d no wall. (%d, %d) path_map is %d", direction, x_queue, y_queue, path_map(x_queue, y_queue));
+      }
 	
     }
     //test print the path_map
-    //path_map_.print();
-    
+    // path_map_.print();    
   }
+
   
 }
 
 
 void PathPlan::setNextDestCell()
 {
-  //locate the current cell
+  // get current location of robot
   int pos_x_int = (int)floor(pos_x_);
   int pos_y_int = (int)floor(pos_y_);
-  
+
+  ROS_INFO("pos_x_int:%d, pos_y_int:%d", pos_x_int, pos_y_int);
+
+  // stop if goal is reached
   if(pos_x_int == GOAL_X && pos_y_int == GOAL_Y){
     goal_reached_ = GOAL_REACH;
     ROS_INFO("Goal Reach!, X:%d, Y:%d", GOAL_X, GOAL_Y);
     return;
   }
-  
-  ROS_INFO("pos_x_int:%d, pos_y_int:%d", pos_x_int, pos_y_int);
-  
-  neighbor_value_(NORTH) = getPathMapValue(pos_x_int, pos_y_int+1);
-  neighbor_value_(EAST) = getPathMapValue(pos_x_int+1, pos_y_int);
-  neighbor_value_(SOUTH) = getPathMapValue(pos_x_int, pos_y_int-1);
-  neighbor_value_(WEST) = getPathMapValue(pos_x_int-1, pos_y_int);
-  
-  int min_heading = UNDEFINED;
-  int min_path_value = 1000;
-  
-  for(int direction = NORTH; direction <= WEST; direction++){
-    if(!hasWall(pos_x_int, pos_y_int, direction)){
-      //find the path with minimum path value and without a obstacle
-      if(neighbor_value_(direction) <= min_path_value){
-	
-	min_path_value = neighbor_value_(direction);
-	min_heading = direction;
+
+  ROS_INFO("history size: %d", (int)history.size());
+
+  pair<int, int> node = history.top();
+
+  // return if robot has not reached target goal
+  if (!(abs(pos_x_ - (node.first + 0.5)) <= 0.1 && abs(pos_y_ - (node.second + 0.5)) <= 0.1)) {
+    return;
+  }
+
+
+  if (explored.find(node) == explored.end()) {
+    ROS_INFO("Moving to unvisited node");
+    // for nodes that are unvisited take the north direction first
+    int x, y;
+    int heading = UNDEFINED;
+    bool is_all_blocked = true;
+    for(int direction = NORTH; direction <= WEST; direction++){
+      if(!hasWall(pos_x_int, pos_y_int, direction)) {
+        is_all_blocked = false;
+        int tmp_x, tmp_y;
+        if(direction == NORTH) {
+          tmp_x = pos_x_int; tmp_y = pos_y_int + 1;
+        } else if (direction == EAST) {
+          tmp_x = pos_x_int + 1; tmp_y = pos_y_int;
+        } else if (direction == SOUTH) {
+          tmp_x = pos_x_int; tmp_y = pos_y_int - 1; 
+        } else if (direction == WEST) {
+          tmp_x = pos_x_int -1; tmp_y = pos_y_int;
+        } else {
+          return;
+        }
+
+        // continue if the next node is explored
+        if (explored.find(pair<int, int>(tmp_x, tmp_y)) != explored.end()) {
+          continue;
+        }
+        heading = direction;
+        x = tmp_x;
+        y = tmp_y;
+        break;
       }
     }
-  }
-  
-  if(min_heading < 0){ //haven't find correct path, then go back
-    target_x_ = target_x_prev_;
-    target_y_ = target_y_prev_;
-  }else{ //update the next target destination
+
+    // return if all walls are blocked at the starting position
+    if (is_all_blocked) {
+      return;
+    }
+
+    // set direction is 5 when all directions for that node has been explored to force bactracking
+    if (heading == UNDEFINED) {
+      explored[node] = 5;
+      return;
+    }
+
+    explored[node] = heading;
+    history.push(pair<int, int>(x, y));
     target_x_prev_ = target_x_;
     target_y_prev_ = target_y_;
-    
-    if(min_heading == NORTH){target_x_ = pos_x_int; target_y_ = pos_y_int+1;}
-    if(min_heading == EAST){target_x_ = pos_x_int+1; target_y_ = pos_y_int;}
-    if(min_heading == SOUTH){target_x_ = pos_x_int; target_y_ = pos_y_int-1;}
-    if(min_heading == WEST){target_x_ = pos_x_int-1; target_y_ = pos_y_int;}
-    
+    target_x_ = x;
+    target_y_ = y;
+  } else {
+    // backtrack or visit neighbouring nodes if nodes have been explored
+    int heading = UNDEFINED;
+
+    // check for unexplored neighbours
+    for(int direction = explored[node] + 1; direction <= WEST; direction++){
+      if(!hasWall(pos_x_int, pos_y_int, direction)) {
+        int tmp_x, tmp_y;
+        if(direction == NORTH) {
+          tmp_x = pos_x_int; tmp_y = pos_y_int + 1;
+        } else if (direction == EAST) {
+          tmp_x = pos_x_int + 1; tmp_y = pos_y_int;
+        } else if (direction == SOUTH) {
+          tmp_x = pos_x_int; tmp_y = pos_y_int - 1; 
+        } else if (direction == WEST) {
+          tmp_x = pos_x_int -1; tmp_y = pos_y_int;
+        } else {
+          return;
+        }
+        if (explored.find(pair<int, int>(tmp_x, tmp_y)) != explored.end()) {
+          ROS_INFO("node %d, %d has been visited", tmp_x, tmp_y);
+          continue;
+        }
+        heading = direction;
+        break;
+      }
+    }
+    ROS_INFO("Heading: %d", heading);
+
+    if (heading == UNDEFINED) {
+      // backtracks when all nodes have been explored and goal is not reached
+      ROS_INFO("Backtracing");
+      history.pop();
+      pair<int, int> prev = history.top();
+      int x = prev.first;
+      int y = prev.second;
+      target_x_prev_ = x;
+      target_y_prev_ = y;
+      target_x_ = x;
+      target_y_ = y;
+      ROS_INFO("Backtracing to x, y %d %d", x, y);
+    } else {
+      // visit neighbouring node
+      ROS_INFO("Moving to next neighbouring node");
+      int x, y;
+
+      if (heading == NORTH) {
+        x = pos_x_int; y = pos_y_int+1;
+      }
+      if (heading == EAST) {
+        x = pos_x_int+1; y = pos_y_int;
+      }
+      if (heading == SOUTH) {
+        x = pos_x_int; y = pos_y_int-1;
+      }
+      if (heading == WEST) {
+        x = pos_x_int-1; y = pos_y_int;
+      }
+
+      explored[node] = heading;
+      history.push(pair<int, int>(x, y));
+      target_x_prev_ = target_x_;
+      target_y_prev_ = target_y_;
+      target_x_ = x;
+      target_y_ = y;
+    }
   }
-  
-  ROS_INFO("Next destination: (%d, %d)", target_x_, target_y_);
-  
 }
 
 int PathPlan::getPathMapValue(int x, int y)

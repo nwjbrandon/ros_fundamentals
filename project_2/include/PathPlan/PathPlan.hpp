@@ -5,6 +5,9 @@
 #include <armadillo>
 #include <math.h>
 #include <stdio.h>
+#include <stack>
+#include <tuple>
+#include <map>
 
 using namespace std;
 using namespace arma;
@@ -46,6 +49,8 @@ private:
   void initializePathMap(); // set all the cell with 1000
   void setNextDestCell(); // based on the current position, find the next heading cell
   int getPathMapValue(int x, int y);
+  std::stack<std::pair<int, int>> history;
+  std::map<std::pair<int, int>, int> explored;
   
 public:
   

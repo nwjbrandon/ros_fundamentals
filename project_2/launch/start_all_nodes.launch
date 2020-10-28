@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <node pkg="project_2" type="range_detect_node" name="range_detect_node" output="screen" launch-prefix="gnome-terminal --command"/>
-  <node pkg="project_2" type="path_plan_node" name="path_plan_node" output="screen" launch-prefix="gnome-terminal --command"/>
+  <node pkg="project_2" type="path_plan_node" name="path_plan_node" output="screen" />
   <node pkg="project_2" type="bot_control_node" name="bot_control_node" output="screen" launch-prefix="gnome-terminal --command"/>
   <rosparam command="load" file="$(find project_2)/config/config.yaml"/>
 </launch>
