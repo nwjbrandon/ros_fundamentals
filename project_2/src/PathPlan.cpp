@@ -352,15 +352,19 @@ void PathPlan::setNextDestCell()
   }
 
 
-  if (explored.find(node) == explored.end()) {
+  if (explored_set.find(node) == explored_set.end()) {
     ROS_INFO("Moving to unvisited node");
-    // not found
+    // current node has not been explored
     int x, y;
     int heading = UNDEFINED;
     bool is_all_blocked = true;
+    std::vector<pair<int, int>> costs;
+
+    // iterate through neighbours to get potential path without revisiting nodes
     for(int direction = NORTH; direction <= WEST; direction++){
       if(!hasWall(pos_x_int, pos_y_int, direction)) {
         is_all_blocked = false;
+
         int tmp_x, tmp_y;
         if(direction == NORTH) {
           tmp_x = pos_x_int; tmp_y = pos_y_int + 1;
@@ -374,74 +378,62 @@ void PathPlan::setNextDestCell()
           return;
         }
 
-        // continue if the potential node is not unexplored
-        if (explored.find(pair<int, int>(tmp_x, tmp_y)) != explored.end()) {
+        // continue if the potential node has been explored to prevent revisiting
+        if (explored_set.find(pair<int, int>(tmp_x, tmp_y)) != explored_set.end()) {
           continue;
-        }
-        heading = direction;
-        x = tmp_x;
-        y = tmp_y;
-        break;
+        } 
+
+        // fetching costs of neighbours
+        costs.push_back(pair<int, int>(path_map_.at(tmp_x, tmp_y), direction));
       }
     }
+
+    // neighbour with lowest cost at index 0
+    std::sort(costs.begin(), costs.end(), [](pair<int, int> &a, pair<int, int> &b) { 
+      if (a.first == b.first) {
+        return a.second < b.second; 
+      }
+      return a.first < b.first; 
+    });
+
+    // happens at starting point 0, 0
     if (is_all_blocked) {
       return;
     }
-    if (heading == UNDEFINED) {
-      explored[node] = 5;
+
+    // force backtrack if all neighbours are blocked or visited
+    if (costs.size() == 0) {
+      int init[]= {0,1,2,3};
+      std::set<int> tmp (init,init+4); 
+      explored_set[node] = tmp;
       return;
     }
 
+    // get target x and y and heading for min cost
+    heading = costs[0].second;
+    if(heading == NORTH) {
+      x = pos_x_int; y = pos_y_int + 1;
+    } else if (heading == EAST) {
+      x = pos_x_int + 1; y = pos_y_int;
+    } else if (heading == SOUTH) {
+      x = pos_x_int; y = pos_y_int - 1; 
+    } else if (heading == WEST) {
+      x = pos_x_int -1; y = pos_y_int;
+    } else {
+      return;
+    }
 
-
-
-
-    // if(!hasWall(pos_x_int, pos_y_int, NORTH)) {
-    //   x = pos_x_int; y = pos_y_int + 1; direction = NORTH;
-    // } else if (!hasWall(pos_x_int, pos_y_int, EAST)) {
-    //   x = pos_x_int + 1; y = pos_y_int; direction = EAST;
-    // } else if (!hasWall(pos_x_int, pos_y_int, SOUTH)) {
-    //   x = pos_x_int; y = pos_y_int - 1; direction = SOUTH;
-    // } else if (!hasWall(pos_x_int, pos_y_int, WEST)) {
-    //   x = pos_x_int -1; y = pos_y_int; direction = WEST;
-    // } else {
-    //   return;
-    // }
-    explored[node] = heading;
     history.push(pair<int, int>(x, y));
     target_x_prev_ = target_x_;
     target_y_prev_ = target_y_;
     target_x_ = x;
     target_y_ = y;
   } else {
-    // found
-    int heading = UNDEFINED;
+    // current node has been explored either by backtracking 
+    std::set<int> directions = explored_set[node];
 
-    for(int direction = explored[node] + 1; direction <= WEST; direction++){
-      if(!hasWall(pos_x_int, pos_y_int, direction)) {
-        int tmp_x, tmp_y;
-        if(direction == NORTH) {
-          tmp_x = pos_x_int; tmp_y = pos_y_int + 1;
-        } else if (direction == EAST) {
-          tmp_x = pos_x_int + 1; tmp_y = pos_y_int;
-        } else if (direction == SOUTH) {
-          tmp_x = pos_x_int; tmp_y = pos_y_int - 1; 
-        } else if (direction == WEST) {
-          tmp_x = pos_x_int -1; tmp_y = pos_y_int;
-        } else {
-          return;
-        }
-        if (explored.find(pair<int, int>(tmp_x, tmp_y)) != explored.end()) {
-          ROS_INFO("node %d, %d has been visited", tmp_x, tmp_y);
-          continue;
-        }
-        heading = direction;
-        break;
-      }
-    }
-    ROS_INFO("Heading: %d", heading);
-
-    if (heading == UNDEFINED) {
+    if (directions.size() >= 4) {
+      // go back a step since all neighbours are blocked
       ROS_INFO("Backtracing");
       history.pop();
       pair<int, int> prev = history.top();
@@ -452,29 +444,73 @@ void PathPlan::setNextDestCell()
       target_x_ = x;
       target_y_ = y;
       ROS_INFO("Backtracing to x, y %d %d", x, y);
+      return;
     } else {
-      ROS_INFO("Moving to next neighbouring node");
+      // explore other neighbours that are not explored yet
       int x, y;
+      int heading = UNDEFINED;
+      std::vector<pair<int, int>> costs;
 
-      if (heading == NORTH) {
-        x = pos_x_int; y = pos_y_int+1;
-      }
-      if (heading == EAST) {
-        x = pos_x_int+1; y = pos_y_int;
-      }
-      if (heading == SOUTH) {
-        x = pos_x_int; y = pos_y_int-1;
-      }
-      if (heading == WEST) {
-        x = pos_x_int-1; y = pos_y_int;
+      // iterate through remaining neighbours 
+      for(int direction = NORTH; direction <= WEST; direction++){
+        if(!hasWall(pos_x_int, pos_y_int, direction)) {
+          int tmp_x, tmp_y;
+          if(direction == NORTH) {
+            tmp_x = pos_x_int; tmp_y = pos_y_int + 1;
+          } else if (direction == EAST) {
+            tmp_x = pos_x_int + 1; tmp_y = pos_y_int;
+          } else if (direction == SOUTH) {
+            tmp_x = pos_x_int; tmp_y = pos_y_int - 1; 
+          } else if (direction == WEST) {
+            tmp_x = pos_x_int -1; tmp_y = pos_y_int;
+          } else {
+            return;
+          }
+
+          // continue if the potential node has been explored to prevent revisiting
+          if (explored_set.find(pair<int, int>(tmp_x, tmp_y)) != explored_set.end()) {
+            continue;
+          } 
+          // continue if direction has been explored
+          if (directions.find(direction) != directions.end()) {
+            continue;
+          }
+
+          // fetching costs of neighbours
+          costs.push_back(pair<int, int>(path_map_.at(tmp_x, tmp_y), direction));
+        }
       }
 
-      explored[node] = heading;
+      // neighbour with lowest cost at index 0
+      std::sort(costs.begin(), costs.end(), [](pair<int, int> &a, pair<int, int> &b) { 
+        if (a.first == b.first) {
+          return a.second < b.second; 
+        }
+        return a.first < b.first; 
+      });
+
+      // get target x and y and heading for min cost
+      heading = costs[0].second;
+      if(heading == NORTH) {
+        x = pos_x_int; y = pos_y_int + 1;
+      } else if (heading == EAST) {
+        x = pos_x_int + 1; y = pos_y_int;
+      } else if (heading == SOUTH) {
+        x = pos_x_int; y = pos_y_int - 1; 
+      } else if (heading == WEST) {
+        x = pos_x_int -1; y = pos_y_int;
+      } else {
+        return;
+      }
+
       history.push(pair<int, int>(x, y));
+      directions.insert(heading);
+      explored_set[node] = directions;
       target_x_prev_ = target_x_;
       target_y_prev_ = target_y_;
       target_x_ = x;
       target_y_ = y;
+      return;
     }
   }
 }

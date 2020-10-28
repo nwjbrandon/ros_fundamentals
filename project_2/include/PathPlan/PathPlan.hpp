@@ -50,7 +50,7 @@ private:
   void setNextDestCell(); // based on the current position, find the next heading cell
   int getPathMapValue(int x, int y);
   std::stack<std::pair<int, int>> history;
-  std::map<std::pair<int, int>, int> explored;
+  std::map<std::pair<int, int>, std::set<int>> explored_set;
   
 public:
   
